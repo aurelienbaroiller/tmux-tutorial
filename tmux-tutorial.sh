@@ -722,7 +722,7 @@ chapter_4() {
 }
 
 chapter_5() {
-    local content_file
+    local content_file i
 
     print_header "Chapter 5: Copy Mode & Scrollback"
 
@@ -1148,7 +1148,7 @@ BANNER
 }
 
 show_menu() {
-    local saved_progress
+    local saved_progress i
     saved_progress=$(load_progress)
 
     print_separator
