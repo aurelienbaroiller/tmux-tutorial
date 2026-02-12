@@ -39,9 +39,9 @@ print_header() {
     local title="$1"
     local width=70
     echo ""
-    echo -e "${BG_BLUE}${WHITE}$(printf '═%.0s' $(seq 1 $width))${RESET}"
+    echo -e "${BG_BLUE}${WHITE}$(printf '═%.0s' $(seq 1 "$width"))${RESET}"
     printf "${BG_BLUE}${WHITE}  %-$((width - 2))s${RESET}\n" "$title"
-    echo -e "${BG_BLUE}${WHITE}$(printf '═%.0s' $(seq 1 $width))${RESET}"
+    echo -e "${BG_BLUE}${WHITE}$(printf '═%.0s' $(seq 1 "$width"))${RESET}"
     echo ""
 }
 
@@ -119,13 +119,13 @@ check_not_inside_tmux() {
 }
 
 cleanup_tutorial_sessions() {
-    local sessions
+    local sessions s
     sessions=$(tmux list-sessions -F '#{session_name}' 2>/dev/null || true)
-    for s in $sessions; do
-        if [[ "$s" == ${TUTORIAL_PREFIX}* ]]; then
+    while IFS= read -r s; do
+        if [[ -n "$s" && "$s" == ${TUTORIAL_PREFIX}* ]]; then
             tmux kill-session -t "$s" 2>/dev/null || true
         fi
-    done
+    done <<< "$sessions"
 }
 
 # Write message to a temp file and return a shell command that displays it
@@ -163,7 +163,7 @@ verify_window_count() {
     local session="$1"
     local expected="$2"
     local actual
-    actual=$(tmux list-windows -t "$session" 2>/dev/null | wc -l | tr -d ' ')
+    actual=$(($(tmux list-windows -t "$session" 2>/dev/null | wc -l)))
     [[ "$actual" -eq "$expected" ]]
 }
 
@@ -177,7 +177,7 @@ verify_pane_count() {
     local session="$1"
     local expected="$2"
     local actual
-    actual=$(tmux list-panes -t "$session" 2>/dev/null | wc -l | tr -d ' ')
+    actual=$(($(tmux list-panes -t "$session" 2>/dev/null | wc -l)))
     [[ "$actual" -ge "$expected" ]]
 }
 
@@ -222,8 +222,8 @@ print_cheatsheet() {
 
     echo -e "  ${CYAN}${BOLD}Panes${RESET}"
     echo -e "  ────────────────────────────────────────────────────"
-    printf "  ${YELLOW}%-18s${RESET} %s\n" 'Ctrl+B %' "Split left/right (vertical)"
-    printf "  ${YELLOW}%-18s${RESET} %s\n" 'Ctrl+B "' "Split top/bottom (horizontal)"
+    printf "  ${YELLOW}%-18s${RESET} %s\n" 'Ctrl+B %' "Split vertically (left/right)"
+    printf "  ${YELLOW}%-18s${RESET} %s\n" 'Ctrl+B "' "Split horizontally (top/bottom)"
     printf "  ${YELLOW}%-18s${RESET} %s\n" "Ctrl+B arrow" "Navigate between panes"
     printf "  ${YELLOW}%-18s${RESET} %s\n" "Ctrl+B o" "Cycle to next pane"
     printf "  ${YELLOW}%-18s${RESET} %s\n" "Ctrl+B q" "Show pane numbers"
@@ -310,8 +310,8 @@ chapter_1() {
     print_info "Even though you left, the session is still running:"
     echo ""
     echo -e "  ${DIM}\$ tmux list-sessions${RESET}"
-    tmux list-sessions 2>/dev/null | while read -r line; do
-        echo -e "  ${GREEN}$line${RESET}"
+    tmux list-sessions 2>/dev/null | while IFS= read -r line; do
+        echo -e "  ${GREEN}${line}${RESET}"
     done
     echo ""
 
@@ -433,6 +433,8 @@ chapter_2() {
 }
 
 chapter_3() {
+    local passed=0
+
     print_header "Chapter 3: Windows (Like Browser Tabs)"
 
     print_info "Inside a session, you can have multiple ${BOLD}windows${RESET}."
@@ -441,50 +443,32 @@ chapter_3() {
     print_info "The status bar at the bottom shows your windows."
     echo ""
 
+    _window_nav_msg() {
+        pane_cmd \
+            "" \
+            "  === $1 ===" \
+            "" \
+            "  Navigate between the 3 windows:" \
+            "    Ctrl+B n/p  Switch windows" \
+            "    Ctrl+B 0-2  Jump to window by number" \
+            "    Ctrl+B w    Window list (interactive)" \
+            "    Ctrl+B d    Detach" \
+            "" \
+            "  Look at the status bar at the bottom -- it shows all windows." \
+            ""
+    }
+
     print_action "Creating a session with 3 named windows..."
     cleanup_tutorial_sessions
 
     tmux new-session -d -s "${TUTORIAL_PREFIX}windows" -n "editor" \
-        "$(pane_cmd \
-            "" \
-            "  === EDITOR WINDOW (0) ===" \
-            "" \
-            "  Navigate between the 3 windows:" \
-            "    Ctrl+B n/p  Switch windows" \
-            "    Ctrl+B 0-2  Jump to window by number" \
-            "    Ctrl+B w    Window list (interactive)" \
-            "    Ctrl+B d    Detach" \
-            "" \
-            "  Look at the status bar at the bottom -- it shows all windows." \
-            "")"
+        "$(_window_nav_msg "EDITOR WINDOW (0)")"
 
     tmux new-window -t "${TUTORIAL_PREFIX}windows" -n "server" \
-        "$(pane_cmd \
-            "" \
-            "  === SERVER WINDOW (1) ===" \
-            "" \
-            "  Navigate between the 3 windows:" \
-            "    Ctrl+B n/p  Switch windows" \
-            "    Ctrl+B 0-2  Jump to window by number" \
-            "    Ctrl+B w    Window list (interactive)" \
-            "    Ctrl+B d    Detach" \
-            "" \
-            "  Look at the status bar at the bottom -- it shows all windows." \
-            "")"
+        "$(_window_nav_msg "SERVER WINDOW (1)")"
 
     tmux new-window -t "${TUTORIAL_PREFIX}windows" -n "logs" \
-        "$(pane_cmd \
-            "" \
-            "  === LOGS WINDOW (2) ===" \
-            "" \
-            "  Navigate between the 3 windows:" \
-            "    Ctrl+B n/p  Switch windows" \
-            "    Ctrl+B 0-2  Jump to window by number" \
-            "    Ctrl+B w    Window list (interactive)" \
-            "    Ctrl+B d    Detach" \
-            "" \
-            "  Look at the status bar at the bottom -- it shows all windows." \
-            "")"
+        "$(_window_nav_msg "LOGS WINDOW (2)")"
 
     tmux select-window -t "${TUTORIAL_PREFIX}windows:editor"
 
@@ -541,10 +525,10 @@ chapter_3() {
     print_key "Ctrl+B &" "Close current window (confirm with y)"
     echo ""
     print_challenge "Do all three:"
-    echo -e "    1. Create a new window with ${YELLOW}Ctrl+B c${RESET}"
-    echo -e "    2. Rename it to 'new-window' with ${YELLOW}Ctrl+B ,${RESET}"
-    echo -e "    3. Switch to 'delete-me' (${YELLOW}Ctrl+B n/p${RESET}) and close it with ${YELLOW}Ctrl+B &${RESET}"
-    echo -e "    4. Detach with ${YELLOW}Ctrl+B d${RESET}"
+    print_key "Ctrl+B c" "Create a new window"
+    print_key "Ctrl+B ," "Rename it to 'new-window'"
+    print_key "Ctrl+B n/p then Ctrl+B &" "Switch to 'delete-me' and close it (confirm with y)"
+    print_key "Ctrl+B d" "Detach to check your answers"
     echo ""
     wait_for_enter "Press Enter to attach... (instructions will be shown inside)"
 
@@ -552,18 +536,17 @@ chapter_3() {
 
     echo ""
     # Verify
-    local passed=0
-    if verify_window_exists "${TUTORIAL_PREFIX}windows" "new-window" 2>/dev/null; then
+    if verify_window_exists "${TUTORIAL_PREFIX}windows" "new-window"; then
         print_success "Window 'new-window' exists -- great job creating and renaming!"
-        ((passed++)) || true
+        passed=$((passed + 1))
     else
         print_fail "Didn't find a window named 'new-window'."
         print_info "Remember: Ctrl+B c creates, Ctrl+B , renames."
     fi
 
-    if ! verify_window_exists "${TUTORIAL_PREFIX}windows" "delete-me" 2>/dev/null; then
+    if ! verify_window_exists "${TUTORIAL_PREFIX}windows" "delete-me"; then
         print_success "Window 'delete-me' was closed -- nice!"
-        ((passed++)) || true
+        passed=$((passed + 1))
     else
         print_fail "Window 'delete-me' still exists."
         print_info "Remember: Ctrl+B & closes a window (confirm with y)."
@@ -592,68 +575,44 @@ chapter_3() {
 }
 
 chapter_4() {
+    local pane_count
+
     print_header "Chapter 4: Panes (Split Screen)"
 
     print_info "Panes let you split a single window into multiple terminals."
     print_info "This is one of tmux's most powerful features."
     echo ""
 
+    _pane_info_msg() {
+        pane_cmd \
+            "" \
+            "  === $1 ===" \
+            "" \
+            "  Navigate between the 3 panes:" \
+            "    Ctrl+B arrow    Move to adjacent pane" \
+            "    Ctrl+B o        Cycle to next pane" \
+            "    Ctrl+B q        Show pane numbers" \
+            "" \
+            "  Try also:" \
+            "    Ctrl+B z          Zoom/unzoom current pane" \
+            "    Ctrl+B Ctrl+arrow Resize pane" \
+            "    Ctrl+B Space      Cycle layouts" \
+            "" \
+            "  When done: Ctrl+B d  to detach" \
+            ""
+    }
+
     print_action "Creating a session with pre-split panes..."
     cleanup_tutorial_sessions
 
     tmux new-session -d -s "${TUTORIAL_PREFIX}panes" -x 120 -y 40 \
-        "$(pane_cmd \
-            "" \
-            "  === PANE 0 (top-left) ===" \
-            "" \
-            "  Navigate between the 3 panes:" \
-            "    Ctrl+B arrow    Move to adjacent pane" \
-            "    Ctrl+B o        Cycle to next pane" \
-            "    Ctrl+B q        Show pane numbers" \
-            "" \
-            "  Try also:" \
-            "    Ctrl+B z          Zoom/unzoom current pane" \
-            "    Ctrl+B Ctrl+arrow Resize pane" \
-            "    Ctrl+B Space      Cycle layouts" \
-            "" \
-            "  When done: Ctrl+B d  to detach" \
-            "")"
+        "$(_pane_info_msg "PANE 0 (top-left)")"
 
     tmux split-window -h -t "${TUTORIAL_PREFIX}panes" \
-        "$(pane_cmd \
-            "" \
-            "  === PANE 1 (top-right) ===" \
-            "" \
-            "  Navigate between the 3 panes:" \
-            "    Ctrl+B arrow    Move to adjacent pane" \
-            "    Ctrl+B o        Cycle to next pane" \
-            "    Ctrl+B q        Show pane numbers" \
-            "" \
-            "  Try also:" \
-            "    Ctrl+B z          Zoom/unzoom current pane" \
-            "    Ctrl+B Ctrl+arrow Resize pane" \
-            "    Ctrl+B Space      Cycle layouts" \
-            "" \
-            "  When done: Ctrl+B d  to detach" \
-            "")"
+        "$(_pane_info_msg "PANE 1 (top-right)")"
 
     tmux split-window -v -t "${TUTORIAL_PREFIX}panes" \
-        "$(pane_cmd \
-            "" \
-            "  === PANE 2 (bottom-right) ===" \
-            "" \
-            "  Navigate between the 3 panes:" \
-            "    Ctrl+B arrow    Move to adjacent pane" \
-            "    Ctrl+B o        Cycle to next pane" \
-            "    Ctrl+B q        Show pane numbers" \
-            "" \
-            "  Try also:" \
-            "    Ctrl+B z          Zoom/unzoom current pane" \
-            "    Ctrl+B Ctrl+arrow Resize pane" \
-            "    Ctrl+B Space      Cycle layouts" \
-            "" \
-            "  When done: Ctrl+B d  to detach" \
-            "")"
+        "$(_pane_info_msg "PANE 2 (bottom-right)")"
 
     tmux select-pane -t "${TUTORIAL_PREFIX}panes.0"
 
@@ -713,8 +672,7 @@ chapter_4() {
     attach_and_wait "${TUTORIAL_PREFIX}panes"
 
     echo ""
-    local pane_count
-    pane_count=$(tmux list-panes -t "${TUTORIAL_PREFIX}panes" 2>/dev/null | wc -l | tr -d ' ')
+    pane_count=$(($(tmux list-panes -t "${TUTORIAL_PREFIX}panes" 2>/dev/null | wc -l)))
     if [[ "$pane_count" -ge 4 ]]; then
         print_success "You created $pane_count panes -- excellent!"
     elif [[ "$pane_count" -gt 1 ]]; then
@@ -744,6 +702,8 @@ chapter_4() {
 }
 
 chapter_5() {
+    local content_file
+
     print_header "Chapter 5: Copy Mode & Scrollback"
 
     print_info "By default, you can't scroll in tmux with your mouse or trackpad."
@@ -754,7 +714,6 @@ chapter_5() {
     cleanup_tutorial_sessions
 
     # Generate 100 lines into a temp file, then display them cleanly
-    local content_file
     content_file=$(mktemp /tmp/tut-msg-XXXXXX)
     for i in $(seq 1 100); do
         echo "Line $i: The quick brown fox jumps over the lazy dog" >> "$content_file"
@@ -998,6 +957,9 @@ SAMPLE
 }
 
 chapter_8() {
+    local win_count pane_count
+    local passed=0
+
     print_header "Chapter 8: Putting It All Together"
 
     print_info "Let's build a complete dev workspace programmatically."
@@ -1035,10 +997,10 @@ SCRIPT
     cleanup_tutorial_sessions
 
     # Actually build it
-    tmux new-session -d -s "${TUTORIAL_PREFIX}workspace" -n editor -x 120 -y 40 \
-        "$(pane_cmd \
+    _workspace_pane_msg() {
+        pane_cmd \
             "" \
-            "  === EDITOR ===" \
+            "  === $1 ===" \
             "" \
             "  Explore this scripted workspace:" \
             "    3 windows: editor, server (2 panes), monitor (4 panes)" \
@@ -1047,88 +1009,26 @@ SCRIPT
             "    Ctrl+B Space  Cycle layouts (try on monitor window)" \
             "" \
             "  When done: Ctrl+B d  to detach" \
-            "")"
+            ""
+    }
+
+    tmux new-session -d -s "${TUTORIAL_PREFIX}workspace" -n editor -x 120 -y 40 \
+        "$(_workspace_pane_msg "EDITOR")"
 
     tmux new-window -t "${TUTORIAL_PREFIX}workspace" -n server \
-        "$(pane_cmd \
-            "" \
-            "  === MAIN SERVER ===" \
-            "" \
-            "  Explore this scripted workspace:" \
-            "    3 windows: editor, server (2 panes), monitor (4 panes)" \
-            "    Ctrl+B n/p    Switch windows" \
-            "    Ctrl+B arrow  Switch panes (in server/monitor)" \
-            "    Ctrl+B Space  Cycle layouts (try on monitor window)" \
-            "" \
-            "  When done: Ctrl+B d  to detach" \
-            "")"
+        "$(_workspace_pane_msg "MAIN SERVER")"
     tmux split-window -h -t "${TUTORIAL_PREFIX}workspace:server" \
-        "$(pane_cmd \
-            "" \
-            "  === API SERVER ===" \
-            "" \
-            "  Explore this scripted workspace:" \
-            "    3 windows: editor, server (2 panes), monitor (4 panes)" \
-            "    Ctrl+B n/p    Switch windows" \
-            "    Ctrl+B arrow  Switch panes (in server/monitor)" \
-            "    Ctrl+B Space  Cycle layouts (try on monitor window)" \
-            "" \
-            "  When done: Ctrl+B d  to detach" \
-            "")"
+        "$(_workspace_pane_msg "API SERVER")"
 
     tmux new-window -t "${TUTORIAL_PREFIX}workspace" -n monitor \
-        "$(pane_cmd \
-            "" \
-            "  === CPU MONITOR ===" \
-            "" \
-            "  Explore this scripted workspace:" \
-            "    3 windows: editor, server (2 panes), monitor (4 panes)" \
-            "    Ctrl+B n/p    Switch windows" \
-            "    Ctrl+B arrow  Switch panes (in server/monitor)" \
-            "    Ctrl+B Space  Cycle layouts (try on monitor window)" \
-            "" \
-            "  When done: Ctrl+B d  to detach" \
-            "")"
+        "$(_workspace_pane_msg "CPU MONITOR")"
     tmux split-window -h -t "${TUTORIAL_PREFIX}workspace:monitor" \
-        "$(pane_cmd \
-            "" \
-            "  === MEMORY MONITOR ===" \
-            "" \
-            "  Explore this scripted workspace:" \
-            "    3 windows: editor, server (2 panes), monitor (4 panes)" \
-            "    Ctrl+B n/p    Switch windows" \
-            "    Ctrl+B arrow  Switch panes (in server/monitor)" \
-            "    Ctrl+B Space  Cycle layouts (try on monitor window)" \
-            "" \
-            "  When done: Ctrl+B d  to detach" \
-            "")"
+        "$(_workspace_pane_msg "MEMORY MONITOR")"
     tmux split-window -v -t "${TUTORIAL_PREFIX}workspace:monitor" \
-        "$(pane_cmd \
-            "" \
-            "  === NETWORK MONITOR ===" \
-            "" \
-            "  Explore this scripted workspace:" \
-            "    3 windows: editor, server (2 panes), monitor (4 panes)" \
-            "    Ctrl+B n/p    Switch windows" \
-            "    Ctrl+B arrow  Switch panes (in server/monitor)" \
-            "    Ctrl+B Space  Cycle layouts (try on monitor window)" \
-            "" \
-            "  When done: Ctrl+B d  to detach" \
-            "")"
+        "$(_workspace_pane_msg "NETWORK MONITOR")"
     tmux select-pane -t "${TUTORIAL_PREFIX}workspace:monitor.0"
     tmux split-window -v -t "${TUTORIAL_PREFIX}workspace:monitor" \
-        "$(pane_cmd \
-            "" \
-            "  === DISK MONITOR ===" \
-            "" \
-            "  Explore this scripted workspace:" \
-            "    3 windows: editor, server (2 panes), monitor (4 panes)" \
-            "    Ctrl+B n/p    Switch windows" \
-            "    Ctrl+B arrow  Switch panes (in server/monitor)" \
-            "    Ctrl+B Space  Cycle layouts (try on monitor window)" \
-            "" \
-            "  When done: Ctrl+B d  to detach" \
-            "")"
+        "$(_workspace_pane_msg "DISK MONITOR")"
     tmux select-layout -t "${TUTORIAL_PREFIX}workspace:monitor" tiled
 
     tmux select-window -t "${TUTORIAL_PREFIX}workspace:editor"
@@ -1172,22 +1072,21 @@ SCRIPT
 
     echo ""
     # Check results
-    local win_count pane_count
     if verify_session_exists "${TUTORIAL_PREFIX}final"; then
-        win_count=$(tmux list-windows -t "${TUTORIAL_PREFIX}final" 2>/dev/null | wc -l | tr -d ' ')
-        pane_count=$(tmux list-panes -a -t "${TUTORIAL_PREFIX}final" 2>/dev/null | wc -l | tr -d ' ')
+        win_count=$(($(tmux list-windows -t "${TUTORIAL_PREFIX}final" 2>/dev/null | wc -l)))
+        pane_count=$(($(tmux list-panes -a -t "${TUTORIAL_PREFIX}final" 2>/dev/null | wc -l)))
 
-        local passed=0
+        passed=0
         if [[ "$win_count" -ge 2 ]]; then
             print_success "Windows: $win_count (needed 2+) -- great!"
-            ((passed++)) || true
+            passed=$((passed + 1))
         else
             print_fail "Windows: $win_count (needed 2+)"
         fi
 
         if [[ "$pane_count" -ge 3 ]]; then
             print_success "Panes: $pane_count total (needed 3+) -- great!"
-            ((passed++)) || true
+            passed=$((passed + 1))
         else
             print_fail "Panes: $pane_count total (needed 3+)"
         fi
