@@ -13,6 +13,8 @@ set -euo pipefail
 
 # ─── Constants & Colors ──────────────────────────────────────────────────────
 
+readonly VERSION="1.0.1"
+readonly REPO_URL="https://github.com/aurelienbaroiller/tmux-tutorial"
 readonly TUTORIAL_PREFIX="tut-"
 readonly PROGRESS_FILE="$HOME/.tmux-tutorial-progress"
 readonly TOTAL_CHAPTERS=8
@@ -1142,6 +1144,7 @@ BANNER
     echo -e "${RESET}"
     echo -e "  ${BOLD}Interactive tmux Tutorial${RESET}"
     echo -e "  ${DIM}Learn by doing -- real sessions, real practice${RESET}"
+    echo -e "  ${DIM}v${VERSION} · ${REPO_URL}${RESET}"
     echo ""
     echo -e "  tmux version: $(tmux -V 2>/dev/null || echo 'unknown')"
     echo ""
