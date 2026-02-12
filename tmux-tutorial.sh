@@ -17,6 +17,7 @@ readonly TUTORIAL_PREFIX="tut-"
 readonly PROGRESS_FILE="$HOME/.tmux-tutorial-progress"
 readonly TOTAL_CHAPTERS=8
 readonly USER_SHELL="${SHELL:-bash}"
+TEMP_FILES=()
 
 # Colors
 readonly RESET='\033[0m'
@@ -122,10 +123,16 @@ cleanup_tutorial_sessions() {
     local sessions s
     sessions=$(tmux list-sessions -F '#{session_name}' 2>/dev/null || true)
     while IFS= read -r s; do
-        if [[ -n "$s" && "$s" == ${TUTORIAL_PREFIX}* ]]; then
+        if [[ -n "$s" && "$s" == "${TUTORIAL_PREFIX}"* ]]; then
             tmux kill-session -t "$s" 2>/dev/null || true
         fi
     done <<< "$sessions"
+
+    # Clean up any leftover temp files
+    for tmpfile in "${TEMP_FILES[@]}"; do
+        [[ -f "$tmpfile" ]] && rm -f "$tmpfile"
+    done
+    TEMP_FILES=()
 }
 
 # Write message to a temp file and return a shell command that displays it
@@ -136,8 +143,9 @@ cleanup_tutorial_sessions() {
 pane_cmd() {
     local tmpfile
     tmpfile=$(mktemp /tmp/tut-msg-XXXXXX)
+    TEMP_FILES+=("$tmpfile")
     printf '%s\n' "$@" > "$tmpfile"
-    echo "cat '${tmpfile}'; rm -f '${tmpfile}'; exec ${USER_SHELL}"
+    echo "cat '${tmpfile}'; rm -f '${tmpfile}'; exec '${USER_SHELL}'"
 }
 
 attach_and_wait() {
@@ -163,21 +171,21 @@ verify_window_count() {
     local session="$1"
     local expected="$2"
     local actual
-    actual=$(($(tmux list-windows -t "$session" 2>/dev/null | wc -l)))
+    actual=$(tmux list-windows -t "$session" 2>/dev/null | wc -l)
     [[ "$actual" -eq "$expected" ]]
 }
 
 verify_window_exists() {
     local session="$1"
     local window_name="$2"
-    tmux list-windows -t "$session" -F '#{window_name}' 2>/dev/null | grep -q "^${window_name}$"
+    tmux list-windows -t "$session" -F '#{window_name}' 2>/dev/null | grep -qFx "$window_name"
 }
 
 verify_pane_count() {
     local session="$1"
     local expected="$2"
     local actual
-    actual=$(($(tmux list-panes -t "$session" 2>/dev/null | wc -l)))
+    actual=$(tmux list-panes -t "$session" 2>/dev/null | wc -l)
     [[ "$actual" -ge "$expected" ]]
 }
 
@@ -188,7 +196,13 @@ save_progress() {
 
 load_progress() {
     if [[ -f "$PROGRESS_FILE" ]]; then
-        cat "$PROGRESS_FILE"
+        local progress
+        progress=$(cat "$PROGRESS_FILE")
+        if [[ "$progress" =~ ^[0-9]+$ ]] && (( progress >= 0 && progress <= TOTAL_CHAPTERS )); then
+            echo "$progress"
+        else
+            echo "0"
+        fi
     else
         echo "0"
     fi
@@ -310,9 +324,13 @@ chapter_1() {
     print_info "Even though you left, the session is still running:"
     echo ""
     echo -e "  ${DIM}\$ tmux list-sessions${RESET}"
-    tmux list-sessions 2>/dev/null | while IFS= read -r line; do
-        echo -e "  ${GREEN}${line}${RESET}"
-    done
+    if tmux list-sessions 2>/dev/null | grep -q .; then
+        tmux list-sessions 2>/dev/null | while IFS= read -r line; do
+            echo -e "  ${GREEN}${line}${RESET}"
+        done
+    else
+        echo -e "  ${DIM}(no sessions)${RESET}"
+    fi
     echo ""
 
     print_info "Now let's kill it to see the difference:"
@@ -672,7 +690,7 @@ chapter_4() {
     attach_and_wait "${TUTORIAL_PREFIX}panes"
 
     echo ""
-    pane_count=$(($(tmux list-panes -t "${TUTORIAL_PREFIX}panes" 2>/dev/null | wc -l)))
+    pane_count=$(tmux list-panes -t "${TUTORIAL_PREFIX}panes" 2>/dev/null | wc -l)
     if [[ "$pane_count" -ge 4 ]]; then
         print_success "You created $pane_count panes -- excellent!"
     elif [[ "$pane_count" -gt 1 ]]; then
@@ -1073,8 +1091,8 @@ SCRIPT
     echo ""
     # Check results
     if verify_session_exists "${TUTORIAL_PREFIX}final"; then
-        win_count=$(($(tmux list-windows -t "${TUTORIAL_PREFIX}final" 2>/dev/null | wc -l)))
-        pane_count=$(($(tmux list-panes -a -t "${TUTORIAL_PREFIX}final" 2>/dev/null | wc -l)))
+        win_count=$(tmux list-windows -t "${TUTORIAL_PREFIX}final" 2>/dev/null | wc -l)
+        pane_count=$(tmux list-panes -a -t "${TUTORIAL_PREFIX}final" 2>/dev/null | wc -l)
 
         passed=0
         if [[ "$win_count" -ge 2 ]]; then
