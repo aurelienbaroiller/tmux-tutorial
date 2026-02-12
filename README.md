@@ -2,6 +2,10 @@
 
 An interactive tutorial that teaches tmux by doing. Instead of just reading docs, you practice in **real tmux sessions** created by the script — then it verifies what you did.
 
+<p align="center">
+  <img src="assets/demo.png" alt="tmux tutorial main menu" width="600">
+</p>
+
 ## Quick Start
 
 ```bash
